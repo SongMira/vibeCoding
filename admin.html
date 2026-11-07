@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>학습지 제출 결과 다운로드 (교사용)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #f1f5f9;
+      color: #1e293b;
+      padding: 30px 20px;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    h1 {
+      font-size: 22px;
+      color: #0f172a;
+    }
+    .btn-group {
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .btn-primary {
+      background-color: #059669;
+      color: white;
+    }
+    .btn-primary:hover {
+      background-color: #047857;
+    }
+    .btn-secondary {
+      background-color: #2563eb;
+      color: white;
+    }
+    .btn-secondary:hover {
+      background-color: #1d4ed8;
+    }
+    button:disabled {
+      background-color: #94a3b8;
+      cursor: not-allowed;
+    }
+    .status-bar {
+      margin-bottom: 15px;
+      font-size: 14px;
+      color: #64748b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .table-container {
+      overflow-x: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+    }
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      white-space: nowrap;
+    }
+    th {
+      background-color: #f8fafc;
+      font-weight: 600;
+      color: #475569;
+    }
+    tr:hover {
+      background-color: #f8fafc;
+    }
+    .empty-msg {
+      text-align: center;
+      padding: 40px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div>
+      <h1>📊 C언어 학습지 제출 결과 관리</h1>
+      <p style="font-size: 13px; color: #64748b; margin-top: 4px;">Firestore 실시간 데이터 확인 및 CSV 내보내기</p>
+    </div>
+    <div class="btn-group">
+      <button id="fetchBtn" class="btn-secondary">새로고침</button>
+      <button id="downloadCsvBtn" class="btn-primary" disabled>CSV 다운로드 (.csv)</button>
+    </div>
+  </header>
+
+  <div class="status-bar">
+    <span id="dataCount">데이터 로딩 대기 중...</span>
+    <span id="lastUpdated" style="font-size: 12px;"></span>
+  </div>
+
+  <div class="table-container">
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th>제출시간</th>
+          <th>학년</th>
+          <th>반</th>
+          <th>번호</th>
+          <th>이름</th>
+          <th>객관식 1</th>
+          <th>객관식 2</th>
+          <th>객관식 3</th>
+          <th>주관식 1</th>
+          <th>주관식 2</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr>
+          <td colspan="10" class="empty-msg">데이터를 불러오는 중입니다...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
+  import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyC6VI46a0waZTfmc3QjEUV89cgT-b1OEGY",
+    authDomain: "vibecoding-ba5e8.firebaseapp.com",
+    projectId: "vibecoding-ba5e8",
+    storageBucket: "vibecoding-ba5e8.firebasestorage.app",
+    messagingSenderId: "197642461161",
+    appId: "1:197642461161:web:030c2e92f207ae11b93578",
+    measurementId: "G-4Y1LP2F7C3"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  let fetchedList = [];
+
+  const fetchBtn = document.getElementById('fetchBtn');
+  const downloadCsvBtn = document.getElementById('downloadCsvBtn');
+  const dataCount = document.getElementById('dataCount');
+  const lastUpdated = document.getElementById('lastUpdated');
+  const tableBody = document.getElementById('tableBody');
+
+  function formatTime(timestamp) {
+    if (!timestamp) return '-';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+  }
+
+  async function loadData() {
+    fetchBtn.disabled = true;
+    fetchBtn.textContent = '불러오는 중...';
+    tableBody.innerHTML = '<tr><td colspan="10" class="empty-msg">데이터를 불러오고 있습니다...</td></tr>';
+
+    try {
+      let q;
+      try {
+        q = query(collection(db, "quiz_submissions"), orderBy("submittedAt", "desc"));
+      } catch (err) {
+        q = collection(db, "quiz_submissions");
+      }
+
+      const snapshot = await getDocs(q);
+      fetchedList = [];
+
+      snapshot.forEach((doc) => {
+        const item = doc.data();
+        fetchedList.push({
+          id: doc.id,
+          grade: item.student?.grade ?? '',
+          classNum: item.student?.classNum ?? '',
+          studentNum: item.student?.studentNum ?? '',
+          name: item.student?.name ?? '',
+          q1: item.answers?.q1 ?? '',
+          q2: item.answers?.q2 ?? '',
+          q3: item.answers?.q3 ?? '',
+          q4: item.answers?.q4 ?? '',
+          q5: item.answers?.q5 ?? '',
+          submittedAt: item.submittedAt
+        });
+      });
+
+      renderTable(fetchedList);
+      dataCount.textContent = `총 ${fetchedList.length}건의 답안이 제출되었습니다.`;
+      lastUpdated.textContent = `기준 시간: ${new Date().toLocaleTimeString('ko-KR')}`;
+      downloadCsvBtn.disabled = fetchedList.length === 0;
+    } catch (err) {
+      console.error("데이터 로드 오류:", err);
+      tableBody.innerHTML = `<tr><td colspan="10" class="empty-msg" style="color: #dc2626;">데이터를 불러오는 중 오류가 발생했습니다.<br>규칙(read 권한)을 확인하세요.</td></tr>`;
+      dataCount.textContent = '로드 실패';
+    } finally {
+      fetchBtn.disabled = false;
+      fetchBtn.textContent = '새로고침';
+    }
+  }
+
+  function renderTable(list) {
+    if (list.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="10" class="empty-msg">제출된 답안이 없습니다.</td></tr>';
+      return;
+    }
+
+    tableBody.innerHTML = list.map(item => `
+      <tr>
+        <td>${formatTime(item.submittedAt)}</td>
+        <td>${item.grade}</td>
+        <td>${item.classNum}</td>
+        <td>${item.studentNum}</td>
+        <td><strong>${escapeHtml(item.name)}</strong></td>
+        <td>${escapeHtml(item.q1)}</td>
+        <td>${escapeHtml(item.q2)}</td>
+        <td>${escapeHtml(item.q3)}</td>
+        <td>${escapeHtml(item.q4)}</td>
+        <td>${escapeHtml(item.q5)}</td>
+      </tr>
+    `).join('');
+  }
+
+  function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function exportToCsv() {
+    if (fetchedList.length === 0) return;
+
+    const headers = ["제출시간", "학년", "반", "번호", "이름", "객관식 1", "객관식 2", "객관식 3", "주관식 1", "주관식 2"];
+
+    const escapeCsv = (val) => {
+      const text = val == null ? '' : String(val);
+      if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+        return `"${text.replace(/"/g, '""')}"`;
+      }
+      return text;
+    };
+
+    const rows = fetchedList.map(item => [
+      formatTime(item.submittedAt),
+      item.grade,
+      item.classNum,
+      item.studentNum,
+      item.name,
+      item.q1,
+      item.q2,
+      item.q3,
+      item.q4,
+      item.q5
+    ].map(escapeCsv).join(','));
+
+    // UTF-8 BOM(\uFEFF)을 추가하여 엑셀에서 열 때 한글 깨짐 방지
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+    const filename = `C언어학습지_제출결과_${dateStr}.csv`;
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  fetchBtn.addEventListener('click', loadData);
+  downloadCsvBtn.addEventListener('click', exportToCsv);
+
+  // 페이지 실행 시 데이터 즉시 불러오기
+  loadData();
+</script>
+
+</body>
+</html>
