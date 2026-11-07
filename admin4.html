@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>형성평가 제출 결과 CSV 다운로드</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background-color: #f1f5f9;
+      margin: 0;
+    }
+    .card {
+      background: white;
+      padding: 32px;
+      border-radius: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      text-align: center;
+      max-width: 480px;
+      width: 90%;
+    }
+    button {
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      padding: 14px 24px;
+      font-size: 1rem;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+    button:hover {
+      background-color: #1d4ed8;
+    }
+    button:disabled {
+      background-color: #94a3b8;
+      cursor: not-allowed;
+    }
+    #status {
+      margin-top: 14px;
+      font-size: 0.9rem;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>형성평가 응답 데이터 다운로드</h2>
+    <p>Firestore에 저장된 학생들의 제출 데이터를 CSV 파일로 추출합니다.</p>
+    <button id="downloadBtn">CSV로 다운로드</button>
+    <div id="status"></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
+    import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAXHn1inKIYq5ejWUgZHj_t2jmrZzPExHo",
+      authDomain: "test-e3a4a.firebaseapp.com",
+      projectId: "test-e3a4a",
+      storageBucket: "test-e3a4a.firebasestorage.app",
+      messagingSenderId: "783338136920",
+      appId: "1:783338136920:web:7e8f39e54d27ddacd7712d",
+      measurementId: "G-WR0895B8W8"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const downloadBtn = document.getElementById('downloadBtn');
+    const status = document.getElementById('status');
+
+    downloadBtn.addEventListener('click', async () => {
+      downloadBtn.disabled = true;
+      status.textContent = '데이터를 불러오는 중...';
+
+      try {
+        const q = collection(db, "submissions");
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+          status.textContent = '저장된 응답 데이터가 없습니다.';
+          downloadBtn.disabled = false;
+          return;
+        }
+
+        // CSV 헤더 정의
+        const headers = ["제출일시", "관리번호", "이름", "1번(객관식)", "2번(단답)", "3번(서술)"];
+        const rows = [headers];
+
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          const submittedAt = data.submittedAt ? data.submittedAt.toDate().toLocaleString('ko-KR') : '';
+          const studentId = data.studentId || '';
+          const studentName = data.studentName || '';
+          const q1 = data.answers?.q1 || '';
+          const q2 = data.answers?.q2 || '';
+          // CSV 포맷 내 줄바꿈 및 따옴표 escape 처리
+          const q3 = (data.answers?.q3 || '').replace(/"/g, '""');
+
+          rows.push([
+            `"${submittedAt}"`,
+            `"${studentId}"`,
+            `"${studentName}"`,
+            `"${q1}"`,
+            `"${q2}"`,
+            `"${q3}"`
+          ]);
+        });
+
+        // CSV 문자열 조립 (엑셀 한글 깨짐 방지를 위한 UTF-8 BOM '\uFEFF' 추가)
+        const csvContent = '\uFEFF' + rows.map(e => e.join(',')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `형성평가_결과_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        status.textContent = `총 ${querySnapshot.size}건의 데이터를 성공적으로 다운로드했습니다.`;
+      } catch (error) {
+        console.error("다운로드 실패:", error);
+        status.textContent = '데이터를 불러오지 못했습니다. 보안 규칙을 확인하세요.';
+      } finally {
+        downloadBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
