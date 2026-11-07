@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>교사용 발표자 추첨기</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #f3f4f6;
+      color: #1f2937;
+      padding: 24px 16px;
+    }
+    .container {
+      max-width: 1050px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 768px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+    }
+    .card {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      border: 1px solid #e5e7eb;
+    }
+    h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: #111827;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      font-size: 0.85rem;
+      font-weight: 600;
+      background: #e0e7ff;
+      color: #4338ca;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+    .generator-box {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    .generator-box input {
+      width: 80px;
+      padding: 6px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+    .btn-secondary {
+      background-color: #4b5563;
+      color: #fff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .btn-secondary:hover {
+      background-color: #374151;
+    }
+    textarea {
+      width: 100%;
+      height: 320px;
+      padding: 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      resize: vertical;
+      font-family: inherit;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    textarea:focus {
+      outline: 2px solid #6366f1;
+      border-color: transparent;
+    }
+    .main-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .display-screen {
+      background: #1e1e24;
+      border-radius: 12px;
+      height: 200px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .current-name {
+      font-size: 3rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #38bdf8;
+      min-height: 72px;
+      display: flex;
+      align-items: center;
+    }
+    .screen-status {
+      font-size: 0.9rem;
+      color: #9ca3af;
+      position: absolute;
+      bottom: 14px;
+    }
+    .controls-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .control-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .custom-input-group {
+      display: flex;
+      gap: 6px;
+      flex: 1;
+    }
+    .custom-input-group input {
+      flex: 1;
+      min-width: 180px;
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+    button.action-btn {
+      border: none;
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn-draw {
+      background: #2563eb;
+      color: white;
+    }
+    .btn-draw:hover {
+      background: #1d4ed8;
+    }
+    .btn-pick-custom {
+      background: #059669;
+      color: white;
+    }
+    .btn-pick-custom:hover {
+      background: #047857;
+    }
+    .btn-pick-all {
+      background: #d97706;
+      color: white;
+    }
+    .btn-pick-all:hover {
+      background: #b45309;
+    }
+    .btn-reset {
+      background: #dc2626;
+      color: white;
+    }
+    .btn-reset:hover {
+      background: #b91c1c;
+    }
+    button:disabled {
+      background: #d1d5db !important;
+      color: #9ca3af !important;
+      cursor: not-allowed;
+    }
+    .history-card {
+      min-height: 180px;
+    }
+    .history-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+    .history-tag {
+      background: #e5e7eb;
+      color: #374151;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .history-order {
+      background: #4b5563;
+      color: #ffffff;
+      font-size: 0.75rem;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 왼쪽: 명단 관리 -->
+  <div class="card">
+    <h2>
+      명단 칸
+      <span class="badge" id="nameCountBadge">총 0명</span>
+    </h2>
+
+    <div class="generator-box">
+      <input type="number" id="genCountInput" value="20" min="1" max="100">
+      <button class="btn-secondary" id="btnGenDefault" type="button">기본 명단 채우기</button>
+    </div>
+
+    <textarea id="nameListInput" placeholder="이름을 한 줄에 한 명씩 입력하세요."></textarea>
+  </div>
+
+  <!-- 오른쪽: 발표자 추첨 및 지정 -->
+  <div class="main-panel">
+    <div class="display-screen">
+      <div class="current-name" id="displayBoard">대기 중</div>
+      <div class="screen-status" id="screenStatus">추첨 또는 지정을 진행해주세요.</div>
+    </div>
+
+    <div class="card">
+      <h2>추첨 및 지정 메뉴</h2>
+      <div class="controls-grid">
+        <!-- 1명 랜덤 추첨 -->
+        <div class="control-row">
+          <button class="action-btn btn-draw" id="btnPickOne">무작위 1명 추첨</button>
+          <button class="action-btn btn-pick-all" id="btnPickRest">나머지 전원 무작위 추첨</button>
+          <button class="action-btn btn-reset" id="btnReset">명단 초기화</button>
+        </div>
+
+        <!-- 특정 번호 지정 발표 -->
+        <div class="control-row">
+          <div class="custom-input-group">
+            <input type="text" id="targetNumbersInput" placeholder="지정할 번호 입력 (예: 3, 5, 12)">
+            <button class="action-btn btn-pick-custom" id="btnPickSpecific">지정 번호 발표</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card history-card">
+      <h2>
+        발표자 기록
+        <span class="badge" id="pickedCountBadge">0명</span>
+      </h2>
+      <div class="history-list" id="historyList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const nameListInput = document.getElementById('nameListInput');
+  const genCountInput = document.getElementById('genCountInput');
+  const btnGenDefault = document.getElementById('btnGenDefault');
+  const nameCountBadge = document.getElementById('nameCountBadge');
+  const displayBoard = document.getElementById('displayBoard');
+  const screenStatus = document.getElementById('screenStatus');
+  const btnPickOne = document.getElementById('btnPickOne');
+  const btnPickSpecific = document.getElementById('btnPickSpecific');
+  const targetNumbersInput = document.getElementById('targetNumbersInput');
+  const btnPickRest = document.getElementById('btnPickRest');
+  const btnReset = document.getElementById('btnReset');
+  const historyList = document.getElementById('historyList');
+  const pickedCountBadge = document.getElementById('pickedCountBadge');
+
+  let pickedHistory = [];
+  let isRunning = false;
+
+  // 기본 번호 명단 생성 (학생01 ~ 학생20 등)
+  function generateDefaultList(count) {
+    const names = [];
+    const digits = Math.max(2, String(count).length);
+    for (let i = 1; i <= count; i++) {
+      names.push(`학생${String(i).padStart(digits, '0')}`);
+    }
+    return names.join('\n');
+  }
+
+  function getCleanList() {
+    return nameListInput.value
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+  }
+
+  function updateCountBadge() {
+    const list = getCleanList();
+    nameCountBadge.textContent = `남은 인원: ${list.length}명`;
+  }
+
+  function setControlsDisabled(disabled) {
+    btnPickOne.disabled = disabled;
+    btnPickSpecific.disabled = disabled;
+    btnPickRest.disabled = disabled;
+    btnReset.disabled = disabled;
+    btnGenDefault.disabled = disabled;
+    nameListInput.disabled = disabled;
+    targetNumbersInput.disabled = disabled;
+  }
+
+  // 롤링 애니메이션
+  function animateRoll(candidates) {
+    return new Promise(resolve => {
+      let speed = 40;
+      let duration = 0;
+      const maxDuration = 1600;
+
+      function roll() {
+        const randomIndex = Math.floor(Math.random() * candidates.length);
+        displayBoard.textContent = candidates[randomIndex];
+        duration += speed;
+
+        if (duration < maxDuration) {
+          speed += 8;
+          setTimeout(roll, speed);
+        } else {
+          resolve();
+        }
+      }
+      roll();
+    });
+  }
+
+  // 단일 항목 선정 처리 공통 함수
+  function commitPicked(chosenName) {
+    const list = getCleanList();
+    const index = list.indexOf(chosenName);
+    if (index !== -1) {
+      list.splice(index, 1);
+      nameListInput.value = list.join('\n');
+      updateCountBadge();
+    }
+    pickedHistory.push(chosenName);
+    renderHistory();
+  }
+
+  // 무작위 1명 추첨
+  async function pickRandomSingle() {
+    const list = getCleanList();
+    if (list.length === 0) return null;
+
+    await animateRoll(list);
+
+    const chosenIndex = Math.floor(Math.random() * list.length);
+    const chosenName = list[chosenIndex];
+
+    displayBoard.textContent = chosenName;
+    commitPicked(chosenName);
+    return chosenName;
+  }
+
+  // 지정된 학생 1명 애니메이션 연출 후 확정
+  async function pickSpecificSingle(targetName) {
+    const list = getCleanList();
+    if (list.length === 0) return;
+
+    await animateRoll(list);
+
+    displayBoard.textContent = targetName;
+    commitPicked(targetName);
+  }
+
+  // 번호 추출 헬퍼 (예: "3" -> "학생03", "학생3" 매칭)
+  function findStudentByNumber(numStr, list) {
+    const num = parseInt(numStr.replace(/[^0-9]/g, ''), 10);
+    if (isNaN(num)) return null;
+
+    // 1) 정확한 숫자 매칭 (학생03, 학생 3, 3번 등에서 숫자 추출)
+    return list.find(item => {
+      const match = item.match(/\d+/);
+      return match && parseInt(match[0], 10) === num;
+    });
+  }
+
+  // 지정 번호 순차 발표 처리
+  btnPickSpecific.addEventListener('click', async () => {
+    if (isRunning) return;
+
+    const rawInput = targetNumbersInput.value.trim();
+    if (!rawInput) {
+      alert('지정할 번호를 입력해주세요. (예: 3, 5, 12)');
+      return;
+    }
+
+    const tokens = rawInput.split(/[, ]+/).filter(Boolean);
+    const list = getCleanList();
+    const targetsToPick = [];
+    const notFound = [];
+
+    // 현재 남은 명단에서 대상자 매칭
+    let tempList = [...list];
+    for (const token of tokens) {
+      const found = findStudentByNumber(token, tempList);
+      if (found) {
+        targetsToPick.push(found);
+        tempList = tempList.filter(name => name !== found);
+      } else {
+        notFound.push(token);
+      }
+    }
+
+    if (notFound.length > 0) {
+      alert(`남은 명단에서 찾을 수 없는 번호: ${notFound.join(', ')}`);
+      if (targetsToPick.length === 0) return;
+    }
+
+    isRunning = true;
+    setControlsDisabled(true);
+
+    for (let i = 0; i < targetsToPick.length; i++) {
+      const target = targetsToPick[i];
+      screenStatus.textContent = `지정 발표자 확정 중... (${i + 1}/${targetsToPick.length})`;
+      await pickSpecificSingle(target);
+      if (i < targetsToPick.length - 1) {
+        await new Promise(r => setTimeout(r, 600));
+      }
+    }
+
+    screenStatus.textContent = `지정 인원(${targetsToPick.length}명) 발표가 완료되었습니다.`;
+    targetNumbersInput.value = '';
+    isRunning = false;
+    setControlsDisabled(false);
+  });
+
+  // 무작위 1명 추첨 버튼
+  btnPickOne.addEventListener('click', async () => {
+    if (isRunning) return;
+    const list = getCleanList();
+    if (list.length === 0) {
+      alert('추첨할 명단이 없습니다.');
+      return;
+    }
+
+    isRunning = true;
+    setControlsDisabled(true);
+    screenStatus.textContent = '무작위 추첨 진행 중...';
+
+    const chosen = await pickRandomSingle();
+    screenStatus.textContent = `축하합니다! (${chosen})`;
+
+    isRunning = false;
+    setControlsDisabled(false);
+  });
+
+  // 나머지 전원 순차 추첨 버튼
+  btnPickRest.addEventListener('click', async () => {
+    if (isRunning) return;
+    const total = getCleanList().length;
+    if (total === 0) {
+      alert('남은 인원이 없습니다.');
+      return;
+    }
+
+    isRunning = true;
+    setControlsDisabled(true);
+
+    for (let i = 0; i < total; i++) {
+      screenStatus.textContent = `나머지 인원 추첨 중... (${i + 1}/${total})`;
+      await pickRandomSingle();
+      if (i < total - 1) {
+        await new Promise(r => setTimeout(r, 600));
+      }
+    }
+
+    screenStatus.textContent = '모든 인원의 추첨이 완료되었습니다.';
+    isRunning = false;
+    setControlsDisabled(false);
+  });
+
+  function renderHistory() {
+    historyList.innerHTML = '';
+    pickedHistory.forEach((name, idx) => {
+      const tag = document.createElement('div');
+      tag.className = 'history-tag';
+      tag.innerHTML = `<span class="history-order">${idx + 1}</span>${name}`;
+      historyList.appendChild(tag);
+    });
+    pickedCountBadge.textContent = `${pickedHistory.length}명`;
+  }
+
+  // 초기화 및 기본 명단 생성 이벤트
+  btnGenDefault.addEventListener('click', () => {
+    const count = parseInt(genCountInput.value, 10) || 20;
+    nameListInput.value = generateDefaultList(count);
+    updateCountBadge();
+  });
+
+  nameListInput.addEventListener('input', updateCountBadge);
+
+  btnReset.addEventListener('click', () => {
+    if (confirm('추첨 기록을 비우시겠습니까?')) {
+      pickedHistory = [];
+      renderHistory();
+      displayBoard.textContent = '대기 중';
+      screenStatus.textContent = '초기화되었습니다.';
+      updateCountBadge();
+    }
+  });
+
+  // 최초 로드 시 기본 20명 자동 입력
+  nameListInput.value = generateDefaultList(20);
+  updateCountBadge();
+</script>
+
+</body>
+</html>

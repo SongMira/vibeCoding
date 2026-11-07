@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>직사각형 바운싱 볼 시뮬레이션</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
+    body {
+      font-family: 'Pretendard', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center justify-center p-4">
+
+  <!-- 메인 컨테이너 -->
+  <div class="w-full max-w-3xl flex flex-col items-center">
+    <!-- 헤더 -->
+    <header class="text-center mb-5">
+      <h1 id="appTitle" class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-indigo-400 mb-1 transition-all duration-300">
+        공 튕기기 시뮬레이션
+      </h1>
+      <p class="text-slate-400 text-sm">
+        직사각형 캔버스 벽에 부딪히면 튕겨 나오는 물리 효과 애니메이션
+      </p>
+    </header>
+
+    <!-- 제목 관리 바 (텍스트 입력, 등록 버튼 및 드롭다운 선택) -->
+    <div class="w-full mb-4 p-3 bg-slate-800/90 rounded-2xl border border-slate-700/80 shadow-lg flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
+      <!-- 텍스트 입력창 -->
+      <div class="relative flex-1">
+        <i class="fa-solid fa-pen absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+        <input id="titleInput" type="text" placeholder="새로운 캔버스 제목 입력..." 
+          class="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition" />
+      </div>
+
+      <!-- 등록 / 저장 버튼 -->
+      <button id="saveTitleBtn" 
+        class="px-4 py-2 bg-teal-500 hover:bg-teal-400 active:scale-95 text-slate-950 font-bold text-sm rounded-xl transition duration-150 flex items-center justify-center gap-1.5 shadow whitespace-nowrap">
+        <i class="fa-solid fa-plus text-xs"></i>
+        <span>제목 등록</span>
+      </button>
+
+      <!-- 저장된 제목 드롭다운 목록 -->
+      <div class="relative flex-1 sm:max-w-[210px]">
+        <select id="titleDropdown" 
+          class="w-full appearance-none px-3.5 py-2 pr-8 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 cursor-pointer transition truncate">
+          <option value="공 튕기기 시뮬레이션">공 튕기기 시뮬레이션</option>
+          <option value="네온 바운스 볼">네온 바운스 볼</option>
+          <option value="물리 시뮬레이터 LAB">물리 시뮬레이터 LAB</option>
+        </select>
+        <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+      </div>
+    </div>
+
+    <!-- 캔버스 컨테이너 (직사각형 테두리 및 그림자) -->
+    <div class="relative w-full aspect-[16/9] max-h-[460px] bg-slate-950/80 rounded-2xl border-2 border-slate-700/80 shadow-2xl overflow-hidden backdrop-blur-md">
+      <canvas id="simCanvas" class="w-full h-full block cursor-pointer"></canvas>
+      
+      <!-- 부딪힌 횟수 카운터 배지 -->
+      <div class="absolute top-3 left-3 bg-slate-900/80 border border-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-300 flex items-center gap-2 shadow">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>벽 충돌 횟수: <span id="bounceCount" class="text-emerald-400 font-bold">0</span></span>
+      </div>
+
+      <!-- 공 개수 배지 -->
+      <div class="absolute top-3 right-3 bg-slate-900/80 border border-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-300 flex items-center gap-1.5 shadow">
+        <i class="fa-solid fa-shapes text-indigo-400 text-[10px]"></i>
+        <span>도형 개수: <span id="ballCountDisplay" class="text-indigo-400 font-bold">1</span>개</span>
+      </div>
+    </div>
+
+    <!-- 컨트롤 패널 -->
+    <div class="w-full mt-5 p-5 bg-slate-800/80 rounded-2xl border border-slate-700 shadow-lg">
+      
+      <!-- 5가지 모양 선택 체크박스 그룹 -->
+      <div class="mb-5 p-3.5 bg-slate-900/80 rounded-xl border border-slate-700/80">
+        <div class="flex justify-between items-center mb-2.5">
+          <span class="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-shapes text-indigo-400"></i> 모양 선택 (체크 시 즉시 적용)
+          </span>
+          <span id="activeShapeLabel" class="text-xs text-indigo-400 font-semibold">원형</span>
+        </div>
+        <div class="grid grid-cols-5 gap-2" id="shapeCheckboxGroup">
+          <label class="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-800/90 border border-slate-700 hover:border-indigo-400/60 cursor-pointer transition select-none">
+            <input type="checkbox" name="shapeOption" value="circle" checked class="accent-indigo-500 mb-1">
+            <span class="text-xs text-slate-300 font-medium">원형</span>
+          </label>
+          <label class="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-800/90 border border-slate-700 hover:border-indigo-400/60 cursor-pointer transition select-none">
+            <input type="checkbox" name="shapeOption" value="square" class="accent-indigo-500 mb-1">
+            <span class="text-xs text-slate-300 font-medium">사각형</span>
+          </label>
+          <label class="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-800/90 border border-slate-700 hover:border-indigo-400/60 cursor-pointer transition select-none">
+            <input type="checkbox" name="shapeOption" value="star" class="accent-indigo-500 mb-1">
+            <span class="text-xs text-slate-300 font-medium">별</span>
+          </label>
+          <label class="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-800/90 border border-slate-700 hover:border-indigo-400/60 cursor-pointer transition select-none">
+            <input type="checkbox" name="shapeOption" value="triangle" class="accent-indigo-500 mb-1">
+            <span class="text-xs text-slate-300 font-medium">삼각형</span>
+          </label>
+          <label class="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-800/90 border border-slate-700 hover:border-indigo-400/60 cursor-pointer transition select-none">
+            <input type="checkbox" name="shapeOption" value="diamond" class="accent-indigo-500 mb-1">
+            <span class="text-xs text-slate-300 font-medium">마름모</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 별점 1~5단계 아코디언 메뉴 (속도 및 크기 자동 프리셋) -->
+      <div class="mb-5">
+        <div class="flex justify-between items-center mb-2">
+          <span class="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-layer-group text-amber-400"></i> 단계별 아코디언 프리셋 (별점 선택 시 속도/크기 자동 변경)
+          </span>
+          <span id="currentPresetBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-amber-400/10 text-amber-400 border border-amber-400/30 font-bold">
+            3성 적용 중
+          </span>
+        </div>
+
+        <div id="accordionContainer" class="space-y-2">
+          <!-- 아코디언 1단계 -->
+          <div class="accordion-item border border-slate-700 rounded-xl overflow-hidden bg-slate-900/60 transition">
+            <button class="accordion-header w-full flex items-center justify-between px-4 py-2.5 text-left text-sm font-semibold text-slate-200 hover:bg-slate-800/60 transition" data-level="1">
+              <span class="flex items-center gap-2">
+                <span class="text-amber-400">★☆☆☆☆</span>
+                <span>1단계 (미니 초고속)</span>
+              </span>
+              <div class="flex items-center gap-2 text-xs text-slate-400">
+                <span>속도: 12 / 크기: 10px</span>
+                <i class="fa-solid fa-chevron-down text-[11px] transition-transform duration-200"></i>
+              </div>
+            </button>
+            <div class="accordion-content hidden px-4 py-2.5 border-t border-slate-800/80 bg-slate-950/40 text-xs text-slate-400 flex items-center justify-between">
+              <span>작고 민첩한 나노 바운스 모드입니다. 충돌 빈도가 급상승합니다.</span>
+              <button class="apply-preset-btn px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs transition" data-level="1">적용됨</button>
+            </div>
+          </div>
+
+          <!-- 아코디언 2단계 -->
+          <div class="accordion-item border border-slate-700 rounded-xl overflow-hidden bg-slate-900/60 transition">
+            <button class="accordion-header w-full flex items-center justify-between px-4 py-2.5 text-left text-sm font-semibold text-slate-200 hover:bg-slate-800/60 transition" data-level="2">
+              <span class="flex items-center gap-2">
+                <span class="text-amber-400">★★☆☆☆</span>
+                <span>2단계 (소형 쾌속)</span>
+              </span>
+              <div class="flex items-center gap-2 text-xs text-slate-400">
+                <span>속도: 9 / 크기: 14px</span>
+                <i class="fa-solid fa-chevron-down text-[11px] transition-transform duration-200"></i>
+              </div>
+            </button>
+            <div class="accordion-content hidden px-4 py-2.5 border-t border-slate-800/80 bg-slate-950/40 text-xs text-slate-400 flex items-center justify-between">
+              <span>가벼운 움직임과 빠른 속도로 다이내믹한 연출을 보여줍니다.</span>
+              <button class="apply-preset-btn px-2.5 py-1 bg-slate-700 hover:bg-amber-500 hover:text-slate-950 text-slate-200 font-bold rounded-lg text-xs transition" data-level="2">선택하기</button>
+            </div>
+          </div>
+
+          <!-- 아코디언 3단계 (기본) -->
+          <div class="accordion-item border border-amber-500/50 rounded-xl overflow-hidden bg-slate-900/60 transition">
+            <button class="accordion-header w-full flex items-center justify-between px-4 py-2.5 text-left text-sm font-semibold text-slate-200 hover:bg-slate-800/60 transition" data-level="3">
+              <span class="flex items-center gap-2">
+                <span class="text-amber-400">★★★☆☆</span>
+                <span>3단계 (기본 밸런스)</span>
+              </span>
+              <div class="flex items-center gap-2 text-xs text-slate-400">
+                <span>속도: 6 / 크기: 20px</span>
+                <i class="fa-solid fa-chevron-down text-[11px] transition-transform duration-200 rotate-180"></i>
+              </div>
+            </button>
+            <div class="accordion-content px-4 py-2.5 border-t border-slate-800/80 bg-slate-950/40 text-xs text-slate-400 flex items-center justify-between">
+              <span>속도와 볼륨감이 가장 균형잡힌 표준 시뮬레이션 설정입니다.</span>
+              <button class="apply-preset-btn px-2.5 py-1 bg-amber-500 text-slate-950 font-bold rounded-lg text-xs transition" data-level="3">적용됨</button>
+            </div>
+          </div>
+
+          <!-- 아코디언 4단계 -->
+          <div class="accordion-item border border-slate-700 rounded-xl overflow-hidden bg-slate-900/60 transition">
+            <button class="accordion-header w-full flex items-center justify-between px-4 py-2.5 text-left text-sm font-semibold text-slate-200 hover:bg-slate-800/60 transition" data-level="4">
+              <span class="flex items-center gap-2">
+                <span class="text-amber-400">★★★★☆</span>
+                <span>4단계 (대형 묵직)</span>
+              </span>
+              <div class="flex items-center gap-2 text-xs text-slate-400">
+                <span>속도: 4 / 크기: 28px</span>
+                <i class="fa-solid fa-chevron-down text-[11px] transition-transform duration-200"></i>
+              </div>
+            </button>
+            <div class="accordion-content hidden px-4 py-2.5 border-t border-slate-800/80 bg-slate-950/40 text-xs text-slate-400 flex items-center justify-between">
+              <span>묵직한 크기와 절제된 속도로 안정적인 바운스를 즐길 수 있습니다.</span>
+              <button class="apply-preset-btn px-2.5 py-1 bg-slate-700 hover:bg-amber-500 hover:text-slate-950 text-slate-200 font-bold rounded-lg text-xs transition" data-level="4">선택하기</button>
+            </div>
+          </div>
+
+          <!-- 아코디언 5단계 -->
+          <div class="accordion-item border border-slate-700 rounded-xl overflow-hidden bg-slate-900/60 transition">
+            <button class="accordion-header w-full flex items-center justify-between px-4 py-2.5 text-left text-sm font-semibold text-slate-200 hover:bg-slate-800/60 transition" data-level="5">
+              <span class="flex items-center gap-2">
+                <span class="text-amber-400">★★★★★</span>
+                <span>5단계 (거대 슬로우)</span>
+              </span>
+              <div class="flex items-center gap-2 text-xs text-slate-400">
+                <span>속도: 2.5 / 크기: 36px</span>
+                <i class="fa-solid fa-chevron-down text-[11px] transition-transform duration-200"></i>
+              </div>
+            </button>
+            <div class="accordion-content hidden px-4 py-2.5 border-t border-slate-800/80 bg-slate-950/40 text-xs text-slate-400 flex items-center justify-between">
+              <span>압도적인 크기의 오브젝트가 부드럽고 여유롭게 벽을 튕깁니다.</span>
+              <button class="apply-preset-btn px-2.5 py-1 bg-slate-700 hover:bg-amber-500 hover:text-slate-950 text-slate-200 font-bold rounded-lg text-xs transition" data-level="5">선택하기</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 제어 버튼 목록 -->
+      <div class="flex flex-wrap items-center justify-center gap-3 pt-2 border-t border-slate-700/60">
+        <!-- 재생 / 일시정지 -->
+        <button id="playPauseBtn"
+          class="flex items-center gap-2 px-4 py-2.5 bg-teal-500 hover:bg-teal-400 active:scale-95 text-slate-950 font-bold rounded-xl transition duration-150 shadow-md">
+          <i id="playIcon" class="fa-solid fa-pause"></i>
+          <span id="playText">일시정지</span>
+        </button>
+
+        <!-- 색상 변경 버튼 -->
+        <button id="changeColorBtn"
+          class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 active:scale-95 text-white font-bold rounded-xl transition duration-150 shadow-md">
+          <i class="fa-solid fa-palette"></i>
+          <span>색상 변경</span>
+        </button>
+
+        <!-- 도형 추가 -->
+        <button id="addBallBtn"
+          class="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold rounded-xl transition duration-150 shadow-md">
+          <i class="fa-solid fa-plus"></i>
+          <span>도형 추가</span>
+        </button>
+
+        <!-- 초기화 (리셋) -->
+        <button id="resetBtn"
+          class="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:scale-95 text-slate-200 font-semibold rounded-xl transition duration-150 shadow-md">
+          <i class="fa-solid fa-rotate-left"></i>
+          <span>초기화</span>
+        </button>
+      </div>
+      
+      <p class="text-center text-xs text-slate-400">
+        💡 캔버스 내부를 클릭해도 현재 선택된 모양으로 새로운 도형이 생성됩니다!
+      </p>
+    </div>
+  </div>
+
+  <!-- 시뮬레이션 스크립트 -->
+  <script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // UI 요소
+    const bounceCountEl = document.getElementById('bounceCount');
+    const ballCountDisplay = document.getElementById('ballCountDisplay');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const playIcon = document.getElementById('playIcon');
+    const playText = document.getElementById('playText');
+    const changeColorBtn = document.getElementById('changeColorBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const addBallBtn = document.getElementById('addBallBtn');
+    const currentPresetBadge = document.getElementById('currentPresetBadge');
+    const shapeCheckboxes = document.querySelectorAll('input[name="shapeOption"]');
+    const activeShapeLabel = document.getElementById('activeShapeLabel');
+
+    // 별점 단계별 (속도, 크기) 프리셋 정의
+    const presets = {
+      1: { speed: 12, size: 10, stars: '★☆☆☆☆', name: '1단계 (미니 초고속)' },
+      2: { speed: 9,  size: 14, stars: '★★☆☆☆', name: '2단계 (소형 쾌속)' },
+      3: { speed: 6,  size: 20, stars: '★★★☆☆', name: '3단계 (기본 밸런스)' },
+      4: { speed: 4,  size: 28, stars: '★★★★☆', name: '4단계 (대형 묵직)' },
+      5: { speed: 2.5,size: 36, stars: '★★★★★', name: '5단계 (거대 슬로우)' }
+    };
+
+    let currentLevel = 3;
+    let isRunning = true;
+    let totalBounces = 0;
+    let baseSpeed = presets[currentLevel].speed;
+    let defaultRadius = presets[currentLevel].size;
+    let selectedShapes = ['circle'];
+    let balls = [];
+
+    // 생생한 공 색상 팔레트
+    const colors = [
+      { main: '#2dd4bf', glow: 'rgba(45, 212, 191, 0.4)' },
+      { main: '#818cf8', glow: 'rgba(129, 140, 248, 0.4)' },
+      { main: '#f43f5e', glow: 'rgba(244, 63, 94, 0.4)' },
+      { main: '#fbbf24', glow: 'rgba(251, 191, 36, 0.4)' },
+      { main: '#a855f7', glow: 'rgba(168, 85, 247, 0.4)' },
+      { main: '#38bdf8', glow: 'rgba(56, 189, 248, 0.4)' },
+      { main: '#4ade80', glow: 'rgba(74, 222, 128, 0.4)' }
+    ];
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+    }
+
+    // 공(오브젝트) 클래스 정의
+    class Ball {
+      constructor(x, y, radius, speedMultiplier, shape = 'circle') {
+        this.radius = radius;
+        this.shape = shape;
+        this.angle = 0;
+        this.rotationSpeed = (Math.random() - 0.5) * 0.05;
+
+        const logicalW = canvas.getBoundingClientRect().width;
+        const logicalH = canvas.getBoundingClientRect().height;
+
+        this.x = x ?? Math.max(radius, Math.min(logicalW - radius, logicalW / 2));
+        this.y = y ?? Math.max(radius, Math.min(logicalH - radius, logicalH / 2));
+
+        const dir = Math.random() * Math.PI * 2;
+        this.vx = Math.cos(dir) * speedMultiplier;
+        this.vy = Math.sin(dir) * speedMultiplier;
+
+        const colorObj = colors[Math.floor(Math.random() * colors.length)];
+        this.color = colorObj.main;
+        this.glow = colorObj.glow;
+      }
+
+      update(width, height) {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.angle += this.rotationSpeed;
+
+        let bounced = false;
+
+        if (this.x - this.radius <= 0) {
+          this.x = this.radius;
+          this.vx = -this.vx;
+          this.rotationSpeed = -this.rotationSpeed;
+          bounced = true;
+        } else if (this.x + this.radius >= width) {
+          this.x = width - this.radius;
+          this.vx = -this.vx;
+          this.rotationSpeed = -this.rotationSpeed;
+          bounced = true;
+        }
+
+        if (this.y - this.radius <= 0) {
+          this.y = this.radius;
+          this.vy = -this.vy;
+          this.rotationSpeed = -this.rotationSpeed;
+          bounced = true;
+        } else if (this.y + this.radius >= height) {
+          this.y = height - this.radius;
+          this.vy = -this.vy;
+          this.rotationSpeed = -this.rotationSpeed;
+          bounced = true;
+        }
+
+        if (bounced) {
+          totalBounces++;
+          bounceCountEl.textContent = totalBounces;
+        }
+      }
+
+      draw(context) {
+        context.save();
+        context.translate(this.x, this.y);
+        context.rotate(this.angle);
+
+        context.shadowColor = this.glow;
+        context.shadowBlur = 12;
+        context.fillStyle = this.color;
+
+        const r = this.radius;
+
+        switch (this.shape) {
+          case 'square':
+            context.beginPath();
+            context.roundRect(-r, -r, r * 2, r * 2, r * 0.25);
+            context.fill();
+            break;
+
+          case 'star':
+            context.beginPath();
+            const points = 5;
+            const innerR = r * 0.45;
+            for (let i = 0; i < points * 2; i++) {
+              const currentR = i % 2 === 0 ? r : innerR;
+              const a = (i * Math.PI) / points - Math.PI / 2;
+              const px = Math.cos(a) * currentR;
+              const py = Math.sin(a) * currentR;
+              if (i === 0) context.moveTo(px, py);
+              else context.lineTo(px, py);
+            }
+            context.closePath();
+            context.fill();
+            break;
+
+          case 'triangle':
+            context.beginPath();
+            context.moveTo(0, -r);
+            context.lineTo(r * 0.9, r * 0.75);
+            context.lineTo(-r * 0.9, r * 0.75);
+            context.closePath();
+            context.fill();
+            break;
+
+          case 'diamond':
+            context.beginPath();
+            context.moveTo(0, -r * 1.15);
+            context.lineTo(r * 0.85, 0);
+            context.lineTo(0, r * 1.15);
+            context.lineTo(-r * 0.85, 0);
+            context.closePath();
+            context.fill();
+            break;
+
+          case 'circle':
+          default:
+            context.beginPath();
+            context.arc(0, 0, r, 0, Math.PI * 2);
+            context.fill();
+            break;
+        }
+
+        // 광택 하이라이트
+        context.beginPath();
+        context.arc(-r * 0.3, -r * 0.3, r * 0.25, 0, Math.PI * 2);
+        context.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        context.fill();
+
+        context.restore();
+      }
+
+      setSpeed(newSpeed) {
+        const currentSpeed = Math.hypot(this.vx, this.vy) || 1;
+        this.vx = (this.vx / currentSpeed) * newSpeed;
+        this.vy = (this.vy / currentSpeed) * newSpeed;
+      }
+
+      changeColor() {
+        let nextColor;
+        do {
+          nextColor = colors[Math.floor(Math.random() * colors.length)];
+        } while (colors.length > 1 && nextColor.main === this.color);
+        this.color = nextColor.main;
+        this.glow = nextColor.glow;
+      }
+    }
+
+    function getRandomSelectedShape() {
+      return selectedShapes[Math.floor(Math.random() * selectedShapes.length)] || 'circle';
+    }
+
+    function init() {
+      resizeCanvas();
+      balls = [];
+      totalBounces = 0;
+      bounceCountEl.textContent = '0';
+
+      const rect = canvas.getBoundingClientRect();
+      balls.push(new Ball(rect.width / 2, rect.height / 2, defaultRadius, baseSpeed, getRandomSelectedShape()));
+      updateBallCountUI();
+    }
+
+    function updateBallCountUI() {
+      ballCountDisplay.textContent = balls.length;
+    }
+
+    // 아코디언 메뉴 단계 적용 함수
+    function applyStarPreset(level) {
+      currentLevel = level;
+      const preset = presets[level];
+      baseSpeed = preset.speed;
+      defaultRadius = preset.size;
+
+      currentPresetBadge.textContent = `${level}성 적용 중`;
+
+      // 현재 존재하는 모든 공에 즉시 새로운 속도 및 크기 적용
+      balls.forEach(ball => {
+        ball.setSpeed(baseSpeed);
+        ball.radius = defaultRadius;
+      });
+
+      // 아코디언 UI 활성화 상태 동기화
+      document.querySelectorAll('.accordion-item').forEach(item => {
+        const btn = item.querySelector('.accordion-header');
+        const content = item.querySelector('.accordion-content');
+        const icon = item.querySelector('.fa-chevron-down');
+        const applyBtn = item.querySelector('.apply-preset-btn');
+        const itemLevel = Number(btn.getAttribute('data-level'));
+
+        if (itemLevel === level) {
+          content.classList.remove('hidden');
+          icon.classList.add('rotate-180');
+          item.classList.add('border-amber-500/50');
+          item.classList.remove('border-slate-700');
+          applyBtn.textContent = '적용됨';
+          applyBtn.className = 'apply-preset-btn px-2.5 py-1 bg-amber-500 text-slate-950 font-bold rounded-lg text-xs transition';
+        } else {
+          content.classList.add('hidden');
+          icon.classList.remove('rotate-180');
+          item.classList.remove('border-amber-500/50');
+          item.classList.add('border-slate-700');
+          applyBtn.textContent = '선택하기';
+          applyBtn.className = 'apply-preset-btn px-2.5 py-1 bg-slate-700 hover:bg-amber-500 hover:text-slate-950 text-slate-200 font-bold rounded-lg text-xs transition';
+        }
+      });
+    }
+
+    // 아코디언 헤더 및 적용 버튼 클릭 이벤트 설정
+    document.querySelectorAll('.accordion-header').forEach(header => {
+      header.addEventListener('click', () => {
+        const level = Number(header.getAttribute('data-level'));
+        applyStarPreset(level);
+      });
+    });
+
+    document.querySelectorAll('.apply-preset-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const level = Number(btn.getAttribute('data-level'));
+        applyStarPreset(level);
+      });
+    });
+
+    // 모양 체크박스 선택 시 실시간 모양 변경 핸들러
+    const shapeKoreanNames = {
+      circle: '원형',
+      square: '사각형',
+      star: '별',
+      triangle: '삼각형',
+      diamond: '마름모'
+    };
+
+    shapeCheckboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', (e) => {
+        const checkedList = Array.from(shapeCheckboxes).filter(cb => cb.checked).map(cb => cb.value);
+
+        // 최소 1개는 선택되어 있도록 방어
+        if (checkedList.length === 0) {
+          e.target.checked = true;
+          return;
+        }
+
+        selectedShapes = checkedList;
+        activeShapeLabel.textContent = selectedShapes.map(s => shapeKoreanNames[s]).join(', ');
+
+        // 체크박스 선택 즉시 화면에 떠 있는 공들의 형태를 선택된 모양으로 변경
+        balls.forEach((ball, idx) => {
+          ball.shape = selectedShapes[idx % selectedShapes.length];
+        });
+      });
+    });
+
+    // 메인 루프
+    function animate() {
+      if (isRunning) {
+        const rect = canvas.getBoundingClientRect();
+        
+        ctx.fillStyle = 'rgba(2, 6, 23, 0.28)';
+        ctx.fillRect(0, 0, rect.width, rect.height);
+
+        for (const ball of balls) {
+          ball.update(rect.width, rect.height);
+          ball.draw(ctx);
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+
+    // 윈도우 리사이즈
+    window.addEventListener('resize', resizeCanvas);
+
+    // 재생 / 일시정지 토글
+    playPauseBtn.addEventListener('click', () => {
+      isRunning = !isRunning;
+      if (isRunning) {
+        playIcon.className = 'fa-solid fa-pause';
+        playText.textContent = '일시정지';
+        playPauseBtn.className = playPauseBtn.className.replace('bg-emerald-500', 'bg-teal-500');
+      } else {
+        playIcon.className = 'fa-solid fa-play';
+        playText.textContent = '계속 재생';
+        playPauseBtn.className = playPauseBtn.className.replace('bg-teal-500', 'bg-emerald-500');
+      }
+    });
+
+    // 색상 변경 버튼
+    changeColorBtn.addEventListener('click', () => {
+      balls.forEach(ball => ball.changeColor());
+    });
+
+    // 공 추가 버튼
+    addBallBtn.addEventListener('click', () => {
+      balls.push(new Ball(null, null, defaultRadius, baseSpeed, getRandomSelectedShape()));
+      updateBallCountUI();
+    });
+
+    // 캔버스 클릭 시 공 생성
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      balls.push(new Ball(clickX, clickY, defaultRadius, baseSpeed, getRandomSelectedShape()));
+      updateBallCountUI();
+    });
+
+    // 초기화 버튼
+    resetBtn.addEventListener('click', () => {
+      init();
+    });
+
+    // 페이지 로드 시 시작
+    window.onload = function () {
+      init();
+      animate();
+    };
+  </script>
+</body>
+</html>
