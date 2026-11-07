@@ -33,25 +33,33 @@
       border-radius: 8px;
       cursor: pointer;
       margin-top: 16px;
+      transition: background-color 0.2s;
     }
-    button:hover {
-      background-color: #1d4ed8;
-    }
-    button:disabled {
-      background-color: #94a3b8;
-      cursor: not-allowed;
-    }
+    button:hover { background-color: #1d4ed8; }
+    button:disabled { background-color: #94a3b8; cursor: not-allowed; }
     #status {
+      margin-top: 16px;
+      font-size: 0.95rem;
+      color: #334155;
+      line-height: 1.5;
+      word-break: keep-all;
+    }
+    .error-box {
+      color: #dc2626;
+      background-color: #fee2e2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      padding: 12px;
       margin-top: 14px;
-      font-size: 0.9rem;
-      color: #64748b;
+      text-align: left;
+      font-size: 0.88rem;
     }
   </style>
 </head>
 <body>
 
   <div class="card">
-    <h2>형성평가 응답 데이터 다운로드</h2>
+    <h2>형성평가 응답 데이터 관리자</h2>
     <p>Firestore에 저장된 학생들의 제출 데이터를 CSV 파일로 추출합니다.</p>
     <button id="downloadBtn">CSV로 다운로드</button>
     <div id="status"></div>
@@ -59,7 +67,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAXHn1inKIYq5ejWUgZHj_t2jmrZzPExHo",
@@ -79,14 +87,13 @@
 
     downloadBtn.addEventListener('click', async () => {
       downloadBtn.disabled = true;
-      status.textContent = '데이터를 불러오는 중...';
+      status.innerHTML = '데이터를 불러오는 중...';
 
       try {
-        const q = collection(db, "submissions");
-        const querySnapshot = await getDocs(q);
+        const querySnapshot = await getDocs(collection(db, "submissions"));
 
         if (querySnapshot.empty) {
-          status.textContent = '저장된 응답 데이터가 없습니다.';
+          status.innerHTML = '<span style="color: #eab308; font-weight: bold;">⚠️ 저장된 응답 데이터가 0건입니다.</span><br>four.html에서 문제를 푼 뒤 제출해 보세요.';
           downloadBtn.disabled = false;
           return;
         }
@@ -97,12 +104,14 @@
 
         querySnapshot.forEach((doc) => {
           const data = doc.data();
-          const submittedAt = data.submittedAt ? data.submittedAt.toDate().toLocaleString('ko-KR') : '';
+          let submittedAt = '';
+          if (data.submittedAt && data.submittedAt.toDate) {
+            submittedAt = data.submittedAt.toDate().toLocaleString('ko-KR');
+          }
           const studentId = data.studentId || '';
           const studentName = data.studentName || '';
           const q1 = data.answers?.q1 || '';
           const q2 = data.answers?.q2 || '';
-          // CSV 포맷 내 줄바꿈 및 따옴표 escape 처리
           const q3 = (data.answers?.q3 || '').replace(/"/g, '""');
 
           rows.push([
@@ -115,7 +124,7 @@
           ]);
         });
 
-        // CSV 문자열 조립 (엑셀 한글 깨짐 방지를 위한 UTF-8 BOM '\uFEFF' 추가)
+        // CSV 다운로드 (UTF-8 BOM 포함)
         const csvContent = '\uFEFF' + rows.map(e => e.join(',')).join('\n');
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
@@ -128,10 +137,18 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        status.textContent = `총 ${querySnapshot.size}건의 데이터를 성공적으로 다운로드했습니다.`;
+        status.innerHTML = `<span style="color: #16a34a; font-weight: bold;">✔ 총 ${querySnapshot.size}명의 응답 데이터가 다운로드되었습니다.</span>`;
       } catch (error) {
-        console.error("다운로드 실패:", error);
-        status.textContent = '데이터를 불러오지 못했습니다. 보안 규칙을 확인하세요.';
+        console.error("다운로드 에러:", error);
+        let errorMsg = error.message;
+        if (error.code === 'permission-denied') {
+          errorMsg = '파이어스토어 보안 규칙에서 읽기 권한(read)이 허용되지 않았습니다. Firebase 콘솔의 규칙을 확인해 주세요.';
+        }
+        status.innerHTML = `
+          <div class="error-box">
+            <strong>다운로드 실패 오류:</strong><br>${errorMsg}
+          </div>
+        `;
       } finally {
         downloadBtn.disabled = false;
       }
