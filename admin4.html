@@ -90,7 +90,8 @@
       status.innerHTML = '데이터를 불러오는 중...';
 
       try {
-        const querySnapshot = await getDocs(collection(db, "submissions"));
+        // [수정 1] four.html에서 저장한 컬렉션명 "quiz_submissions"로 변경
+        const querySnapshot = await getDocs(collection(db, "quiz_submissions"));
 
         if (querySnapshot.empty) {
           status.innerHTML = '<span style="color: #eab308; font-weight: bold;">⚠️ 저장된 응답 데이터가 0건입니다.</span><br>four.html에서 문제를 푼 뒤 제출해 보세요.';
@@ -110,9 +111,13 @@
           }
           const studentId = data.studentId || '';
           const studentName = data.studentName || '';
-          const q1 = data.answers?.q1 || '';
-          const q2 = data.answers?.q2 || '';
-          const q3 = (data.answers?.q3 || '').replace(/"/g, '""');
+
+          // [수정 2] answers 하위가 아닌 data.q1, data.q2, data.q3를 직접 읽도록 수정
+          // (혹시 이전 버전에서 answers 객체로 저장된 데이터가 있더라도 호환되도록 fallback 처리)
+          const q1 = data.q1 || data.answers?.q1 || '';
+          const q2 = data.q2 || data.answers?.q2 || '';
+          const rawQ3 = data.q3 || data.answers?.q3 || '';
+          const q3 = String(rawQ3).replace(/"/g, '""');
 
           rows.push([
             `"${submittedAt}"`,
