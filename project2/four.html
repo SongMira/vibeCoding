@@ -227,7 +227,6 @@
       transition: all 0.3s ease;
     }
 
-    /* 시뮬레이션 내부 동적 요소 기본 및 스타일 */
     .sim-preview-title {
       font-size: 1.25rem;
       font-weight: 800;
@@ -413,6 +412,12 @@
       transform: scale(0.99);
     }
 
+    .submit-button:disabled {
+      background-color: #94a3b8;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
     /* 제출 완료 화면 */
     #successMessage {
       display: none;
@@ -488,7 +493,6 @@
       </p>
 
       <div class="sim-panel">
-        <!-- 1. HTML 마크업 제어 토글 -->
         <div>
           <div class="control-group-title">1단계: HTML 마크업 태그 추가 / 제거</div>
           <div class="sim-buttons">
@@ -507,7 +511,6 @@
           </div>
         </div>
 
-        <!-- 2. CSS 스타일 제어 토글 -->
         <div>
           <div class="control-group-title">2단계: CSS 스타일링 적용 / 해제</div>
           <div class="sim-buttons">
@@ -526,7 +529,6 @@
           </div>
         </div>
 
-        <!-- 미니 브라우저 뷰어 -->
         <div class="mini-browser">
           <div class="mini-browser-bar">
             <span class="browser-dot red"></span>
@@ -556,7 +558,6 @@
       </header>
 
       <form id="quizForm" novalidate>
-        <!-- 학생 기본 정보 입력 -->
         <div class="student-info-box">
           <div class="field-group">
             <label class="field-label" for="studentId">
@@ -591,7 +592,6 @@
           </div>
         </div>
 
-        <!-- 1번 문제 (객관식) -->
         <div class="question-box">
           <div class="question-header">
             <span class="question-badge">1번 객관식</span>
@@ -613,7 +613,6 @@
           </div>
         </div>
 
-        <!-- 2번 문제 (단답형) -->
         <div class="question-box">
           <div class="question-header">
             <span class="question-badge">2번 단답</span>
@@ -629,7 +628,6 @@
           >
         </div>
 
-        <!-- 3번 문제 (서술형) -->
         <div class="question-box">
           <div class="question-header">
             <span class="question-badge">3번 서술</span>
@@ -643,8 +641,7 @@
           ></textarea>
         </div>
 
-        <!-- 제출하기 버튼 -->
-        <button type="submit" class="submit-button">제출하기</button>
+        <button type="submit" id="submitBtn" class="submit-button">제출하기</button>
       </form>
 
       <!-- 제출 완료 안내 영역 -->
@@ -665,10 +662,8 @@
 
   </div>
 
+  <!-- 1. 시뮬레이션 인터랙션 로직 -->
   <script>
-    /* =========================================
-       1. 시뮬레이션 상태 및 인터랙션 로직
-       ========================================= */
     const simState = {
       html: {
         title: true,
@@ -685,7 +680,6 @@
     function toggleSimTag(type) {
       simState.html[type] = !simState.html[type];
 
-      // 버튼 활성/비활성 클래스 토글
       const btnMap = {
         title: 'toggleH1',
         desc: 'toggleP',
@@ -693,7 +687,6 @@
       };
       document.getElementById(btnMap[type]).classList.toggle('active', simState.html[type]);
 
-      // DOM 디스플레이 제어
       const elemMap = {
         title: 'previewTitle',
         desc: 'previewDesc',
@@ -706,7 +699,6 @@
     function toggleSimCss(styleType) {
       simState.css[styleType] = !simState.css[styleType];
 
-      // 버튼 토글
       const btnMap = {
         theme: 'toggleTheme',
         round: 'toggleRound',
@@ -714,7 +706,6 @@
       };
       document.getElementById(btnMap[styleType]).classList.toggle('active', simState.css[styleType]);
 
-      // 스타일 즉시 갱신
       applySimStyles();
     }
 
@@ -724,7 +715,6 @@
       const title = document.getElementById('previewTitle');
       const desc = document.getElementById('previewDesc');
 
-      // 1) 테마 (배경색 및 컬러 스타일)
       if (simState.css.theme) {
         viewer.style.backgroundColor = '#eff6ff';
         title.style.color = '#1e40af';
@@ -741,7 +731,6 @@
         btn.style.color = '#1e293b';
       }
 
-      // 2) 모서리 둥글게 (Border Radius)
       if (simState.css.round) {
         viewer.style.borderRadius = '20px';
         btn.style.borderRadius = '30px';
@@ -750,7 +739,6 @@
         btn.style.borderRadius = '4px';
       }
 
-      // 3) 그림자 (Box Shadow)
       if (simState.css.shadow) {
         btn.style.boxShadow = '0 6px 14px rgba(37, 99, 235, 0.35)';
         viewer.style.boxShadow = 'inset 0 0 16px rgba(0, 0, 0, 0.05)';
@@ -760,31 +748,36 @@
       }
     }
 
-    /* =========================================
-       2. 형성평가 폼 검증 및 제출 로직
-       ========================================= */
-    const quizForm = document.getElementById('quizForm');
-    const successMessage = document.getElementById('successMessage');
-
-    quizForm.addEventListener('submit', function (event) {
-      event.preventDefault();
-
-      // 브라우저 내장 유효성 검사 (빈칸 및 5자리 정규식 확인)
-      if (!quizForm.checkValidity()) {
-        quizForm.reportValidity();
-        return;
-      }
-
-      // 서버 저장 없이 안내 문구 표시
-      quizForm.style.display = 'none';
-      successMessage.style.display = 'block';
-    });
-
-    // 다시 풀기 버튼
-    function resetWorksheet() {
+    // 다시 풀기 함수 전역 선언
+    window.resetWorksheet = function () {
+      const successMessage = document.getElementById('successMessage');
+      const quizForm = document.getElementById('quizForm');
       successMessage.style.display = 'none';
       quizForm.style.display = 'block';
-    }
+    };
   </script>
-</body>
-</html>
+
+  <!-- 2. Firebase SDK 및 데이터 전송 스크립트 -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-analytics.js";
+    import { 
+      getFirestore, 
+      collection, 
+      addDoc, 
+      serverTimestamp 
+    } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAXHn1inKIYq5ejWUgZHj_t2jmrZzPExHo",
+      authDomain: "test-e3a4a.firebaseapp.com",
+      projectId: "test-e3a4a",
+      storageBucket: "test-e3a4a.firebasestorage.app",
+      messagingSenderId: "783338136920",
+      appId: "1:783338136920:web:7e8f39e54d27ddacd7712d",
+      measurementId: "G-WR0895B8W8"
+    };
+
+    // Firebase 초기화
+    const app = initializeApp(firebaseConfig);
+    const analytics = get
