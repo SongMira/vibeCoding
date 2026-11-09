@@ -4,60 +4,15 @@
   <meta charset="UTF-8">
   <title>형성평가 제출 결과 CSV 다운로드</title>
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      background-color: #f1f5f9;
-      margin: 0;
-    }
-    .card {
-      background: white;
-      padding: 32px;
-      border-radius: 16px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-      text-align: center;
-      max-width: 480px;
-      width: 90%;
-    }
-    button {
-      background-color: #2563eb;
-      color: white;
-      border: none;
-      padding: 14px 24px;
-      font-size: 1rem;
-      font-weight: 700;
-      border-radius: 8px;
-      cursor: pointer;
-      margin-top: 16px;
-      transition: background-color 0.2s;
-    }
-    button:hover { background-color: #1d4ed8; }
-    button:disabled { background-color: #94a3b8; cursor: not-allowed; }
-    #status {
-      margin-top: 16px;
-      font-size: 0.95rem;
-      color: #334155;
-      line-height: 1.5;
-      word-break: keep-all;
-    }
-    .error-box {
-      color: #dc2626;
-      background-color: #fee2e2;
-      border: 1px solid #fecaca;
-      border-radius: 8px;
-      padding: 12px;
-      margin-top: 14px;
-      text-align: left;
-      font-size: 0.88rem;
-    }
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f1f5f9;margin:0}
+    .card{background:#fff;padding:32px;border-radius:16px;box-shadow:0 4px 16px rgba(0,0,0,.08);text-align:center;max-width:480px;width:90%}
+    button{background:#2563eb;color:#fff;border:none;padding:14px 24px;font-size:1rem;font-weight:700;border-radius:8px;cursor:pointer;margin-top:16px}
+    button:hover{background:#1d4ed8} button:disabled{background:#94a3b8;cursor:not-allowed}
+    #status{margin-top:16px;font-size:.95rem;color:#334155;line-height:1.5;word-break:keep-all}
+    .error-box{color:#dc2626;background:#fee2e2;border:1px solid #fecaca;border-radius:8px;padding:12px;margin-top:14px;text-align:left;font-size:.88rem}
   </style>
 </head>
 <body>
-
   <div class="card">
     <h2>형성평가 응답 데이터 관리자</h2>
     <p>Firestore에 저장된 학생들의 제출 데이터를 CSV 파일로 추출합니다.</p>
@@ -66,94 +21,71 @@
   </div>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
-    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyAXHn1inKIYq5ejWUgZHj_t2jmrZzPExHo",
-      authDomain: "test-e3a4a.firebaseapp.com",
-      projectId: "test-e3a4a",
-      storageBucket: "test-e3a4a.firebasestorage.app",
-      messagingSenderId: "783338136920",
-      appId: "1:783338136920:web:7e8f39e54d27ddacd7712d",
-      measurementId: "G-WR0895B8W8"
+    const status = document.getElementById('status');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const showError = (title, detail) => {
+      status.innerHTML = `<div class="error-box"><strong>${title}</strong><br>${detail}</div>`;
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    let db, collection, getDocs;
+    try {
+      // SDK는 동적 import로 불러와 로딩 실패도 화면에 표시
+      const appMod = await import("https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js");
+      const fsMod = await import("https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js");
+      ({ collection, getDocs } = fsMod);
+      const app = appMod.initializeApp({
+        apiKey: "AIzaSyAXHn1inKIYq5ejWUgZHj_t2jmrZzPExHo",
+        authDomain: "test-e3a4a.firebaseapp.com",
+        projectId: "test-e3a4a",
+        storageBucket: "test-e3a4a.firebasestorage.app",
+        messagingSenderId: "783338136920",
+        appId: "1:783338136920:web:7e8f39e54d27ddacd7712d",
+        measurementId: "G-WR0895B8W8"
+      });
+      db = fsMod.getFirestore(app);
+    } catch (e) {
+      console.error(e);
+      showError('Firebase SDK 로딩 실패', '인터넷 연결 또는 네트워크 차단(학교 방화벽 등)을 확인하세요.<br>' + e.message);
+      downloadBtn.disabled = true;
+    }
 
-    const downloadBtn = document.getElementById('downloadBtn');
-    const status = document.getElementById('status');
+    const csvCell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
     downloadBtn.addEventListener('click', async () => {
       downloadBtn.disabled = true;
-      status.innerHTML = '데이터를 불러오는 중...';
-
+      status.textContent = '데이터를 불러오는 중...';
       try {
-        // [수정 1] four.html에서 저장한 컬렉션명 "quiz_submissions"로 변경
-        const querySnapshot = await getDocs(collection(db, "quiz_submissions"));
-
-        if (querySnapshot.empty) {
-          status.innerHTML = '<span style="color: #eab308; font-weight: bold;">⚠️ 저장된 응답 데이터가 0건입니다.</span><br>four.html에서 문제를 푼 뒤 제출해 보세요.';
-          downloadBtn.disabled = false;
+        const snap = await getDocs(collection(db, "submissions"));
+        if (snap.empty) {
+          status.innerHTML = '<span style="color:#eab308;font-weight:bold;">⚠️ 저장된 응답 데이터가 0건입니다.</span><br>four.html에서 제출한 뒤 다시 시도하세요.';
           return;
         }
+        const list = snap.docs.map(d => d.data());
+        const ms = x => x?.submittedAt?.toMillis ? x.submittedAt.toMillis() : 0;
+        list.sort((a, b) => ms(a) - ms(b));
 
-        // CSV 헤더 정의
-        const headers = ["제출일시", "관리번호", "이름", "1번(객관식)", "2번(단답)", "3번(서술)"];
-        const rows = [headers];
-
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          let submittedAt = '';
-          if (data.submittedAt && data.submittedAt.toDate) {
-            submittedAt = data.submittedAt.toDate().toLocaleString('ko-KR');
-          }
-          const studentId = data.studentId || '';
-          const studentName = data.studentName || '';
-
-          // [수정 2] answers 하위가 아닌 data.q1, data.q2, data.q3를 직접 읽도록 수정
-          // (혹시 이전 버전에서 answers 객체로 저장된 데이터가 있더라도 호환되도록 fallback 처리)
-          const q1 = data.q1 || data.answers?.q1 || '';
-          const q2 = data.q2 || data.answers?.q2 || '';
-          const rawQ3 = data.q3 || data.answers?.q3 || '';
-          const q3 = String(rawQ3).replace(/"/g, '""');
-
-          rows.push([
-            `"${submittedAt}"`,
-            `"${studentId}"`,
-            `"${studentName}"`,
-            `"${q1}"`,
-            `"${q2}"`,
-            `"${q3}"`
-          ]);
+        const rows = [["제출일시","관리번호","이름","1번(객관식)","2번(단답)","3번(서술)"]];
+        list.forEach(data => {
+          const t = data.submittedAt?.toDate ? data.submittedAt.toDate().toLocaleString('ko-KR') : '';
+          rows.push([t, data.studentId, data.studentName, data.answers?.q1, data.answers?.q2, data.answers?.q3]);
         });
-
-        // CSV 다운로드 (UTF-8 BOM 포함)
-        const csvContent = '\uFEFF' + rows.map(e => e.join(',')).join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-
+        const csv = '\uFEFF' + rows.map(r => r.map(csvCell).join(',')).join('\r\n');
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
         const a = document.createElement('a');
         a.href = url;
-        a.download = `형성평가_결과_${new Date().toISOString().slice(0, 10)}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        a.download = `형성평가_결과_${new Date().toISOString().slice(0,10)}.csv`;
+        document.body.appendChild(a); a.click(); a.remove();
         URL.revokeObjectURL(url);
-
-        status.innerHTML = `<span style="color: #16a34a; font-weight: bold;">✔ 총 ${querySnapshot.size}명의 응답 데이터가 다운로드되었습니다.</span>`;
+        status.innerHTML = `<span style="color:#16a34a;font-weight:bold;">✔ 총 ${snap.size}명의 응답 데이터가 다운로드되었습니다.</span>`;
       } catch (error) {
         console.error("다운로드 에러:", error);
-        let errorMsg = error.message;
-        if (error.code === 'permission-denied') {
-          errorMsg = '파이어스토어 보안 규칙에서 읽기 권한(read)이 허용되지 않았습니다. Firebase 콘솔의 규칙을 확인해 주세요.';
-        }
-        status.innerHTML = `
-          <div class="error-box">
-            <strong>다운로드 실패 오류:</strong><br>${errorMsg}
-          </div>
-        `;
+        const hints = {
+          'permission-denied': 'Firestore 보안 규칙에서 submissions 읽기(read)가 허용되지 않았습니다. Firebase 콘솔 → Firestore → 규칙을 확인하세요.',
+          'failed-precondition': 'Firestore 데이터베이스가 아직 생성되지 않았거나 설정이 필요합니다. 콘솔에서 데이터베이스를 만드세요.',
+          'unavailable': '네트워크 연결 문제로 Firestore에 접속할 수 없습니다.',
+          'not-found': 'Firestore 데이터베이스(default)를 찾을 수 없습니다. 콘솔에서 생성했는지 확인하세요.'
+        };
+        showError(`다운로드 실패 (${error.code || 'unknown'})`, (hints[error.code] || '') + '<br>' + error.message);
       } finally {
         downloadBtn.disabled = false;
       }
