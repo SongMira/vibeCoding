@@ -2,94 +2,191 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>형성평가 제출 결과 CSV 다운로드</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>형성평가 제출 현황 및 CSV 다운로드</title>
   <style>
-    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f1f5f9;margin:0}
-    .card{background:#fff;padding:32px;border-radius:16px;box-shadow:0 4px 16px rgba(0,0,0,.08);text-align:center;max-width:480px;width:90%}
-    button{background:#2563eb;color:#fff;border:none;padding:14px 24px;font-size:1rem;font-weight:700;border-radius:8px;cursor:pointer;margin-top:16px}
+    *{box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;background:#f1f5f9;margin:0;padding:24px;color:#0f172a}
+    .wrap{max-width:1000px;margin:0 auto}
+    .card{background:#fff;padding:24px;border-radius:16px;box-shadow:0 4px 16px rgba(0,0,0,.08);margin-bottom:16px}
+    h2{margin:0 0 6px} .sub{margin:0;color:#64748b;font-size:.92rem}
+    .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:16px}
+    button{background:#2563eb;color:#fff;border:none;padding:11px 18px;font-size:.95rem;font-weight:700;border-radius:8px;cursor:pointer}
     button:hover{background:#1d4ed8} button:disabled{background:#94a3b8;cursor:not-allowed}
-    #status{margin-top:16px;font-size:.95rem;color:#334155;line-height:1.5;word-break:keep-all}
-    .error-box{color:#dc2626;background:#fee2e2;border:1px solid #fecaca;border-radius:8px;padding:12px;margin-top:14px;text-align:left;font-size:.88rem}
+    button.sec{background:#e2e8f0;color:#1e293b} button.sec:hover{background:#cbd5e1}
+    input[type=search]{flex:1;min-width:180px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:.95rem}
+    .live{font-size:.82rem;color:#16a34a;font-weight:700;margin-left:auto}
+    .live.off{color:#94a3b8}
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+    .stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center}
+    .stat .n{font-size:1.7rem;font-weight:800;color:#2563eb} .stat .l{font-size:.82rem;color:#64748b;margin-top:2px}
+    .bars{margin-top:14px;font-size:.88rem}
+    .bar-row{display:flex;align-items:center;gap:8px;margin:5px 0}
+    .bar-row .name{width:70px} .bar{flex:1;background:#e2e8f0;border-radius:6px;height:16px;overflow:hidden}
+    .bar>i{display:block;height:100%;background:#2563eb} .bar-row .cnt{width:60px;text-align:right;color:#475569}
+    .tbl-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:.9rem}
+    th,td{padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:top}
+    th{background:#f8fafc;position:sticky;top:0;white-space:nowrap}
+    td.q3{max-width:320px;word-break:break-word;white-space:pre-wrap}
+    .ok{color:#16a34a;font-weight:700} .no{color:#dc2626;font-weight:700}
+    .dup{background:#fef9c3}
+    .empty{text-align:center;color:#64748b;padding:28px}
+    #status{margin-top:12px;font-size:.92rem;line-height:1.5}
+    .error-box{color:#dc2626;background:#fee2e2;border:1px solid #fecaca;border-radius:8px;padding:12px;text-align:left;font-size:.88rem}
   </style>
 </head>
 <body>
+<div class="wrap">
   <div class="card">
-    <h2>형성평가 응답 데이터 관리자</h2>
-    <p>Firestore에 저장된 학생들의 제출 데이터를 CSV 파일로 추출합니다.</p>
-    <button id="downloadBtn">CSV로 다운로드</button>
+    <h2>형성평가 제출 현황</h2>
+    <p class="sub">학생이 제출하면 이 화면에 실시간으로 나타납니다.</p>
+    <div class="toolbar">
+      <button id="downloadBtn">CSV로 다운로드</button>
+      <button id="reloadBtn" class="sec">새로고침</button>
+      <input type="search" id="search" placeholder="관리번호 또는 이름 검색">
+      <span id="live" class="live off">● 연결 중...</span>
+    </div>
     <div id="status"></div>
   </div>
 
-  <script type="module">
-    const status = document.getElementById('status');
-    const downloadBtn = document.getElementById('downloadBtn');
-    const showError = (title, detail) => {
-      status.innerHTML = `<div class="error-box"><strong>${title}</strong><br>${detail}</div>`;
+  <div class="card">
+    <div class="stats">
+      <div class="stat"><div class="n" id="sTotal">0</div><div class="l">총 제출 건수</div></div>
+      <div class="stat"><div class="n" id="sUnique">0</div><div class="l">제출 인원 (관리번호 기준)</div></div>
+      <div class="stat"><div class="n" id="sDup">0</div><div class="l">중복 제출 인원</div></div>
+      <div class="stat"><div class="n" id="sCorrect">0%</div><div class="l">1번 정답률 (HTML)</div></div>
+      <div class="stat"><div class="n" id="sLatest" style="font-size:1.05rem;padding:9px 0">-</div><div class="l">최근 제출</div></div>
+    </div>
+    <div class="bars" id="bars"></div>
+  </div>
+
+  <div class="card">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>#</th><th>제출일시</th><th>관리번호</th><th>이름</th><th>1번(객관식)</th><th>2번(단답)</th><th>3번(서술)</th>
+        </tr></thead>
+        <tbody id="tbody"><tr><td colspan="7" class="empty">데이터를 불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+  import { getFirestore, collection, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+
+  const app = initializeApp({
+    apiKey: "AIzaSyAXHn1inKIYq5ejWUgZHj_t2jmrZzPExHo",
+    authDomain: "test-e3a4a.firebaseapp.com",
+    projectId: "test-e3a4a",
+    storageBucket: "test-e3a4a.firebasestorage.app",
+    messagingSenderId: "783338136920",
+    appId: "1:783338136920:web:7e8f39e54d27ddacd7712d",
+    measurementId: "G-WR0895B8W8"
+  });
+  const db = getFirestore(app);
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const CORRECT_Q1 = 'HTML';   // 1번 정답
+  const CORRECT_Q2 = 'css';    // 2번 정답(대소문자 무시)
+
+  let records = [];            // 정렬된 제출 데이터
+
+  function showError(error) {
+    const hints = {
+      'permission-denied': 'Firestore 보안 규칙에서 읽기가 허용되지 않았습니다.',
+      'unavailable': '네트워크 연결 문제로 접속할 수 없습니다.'
     };
+    $('status').innerHTML = `<div class="error-box"><strong>불러오기 실패 (${esc(error.code || 'unknown')})</strong><br>${esc(hints[error.code] || '')} ${esc(error.message)}</div>`;
+    $('live').textContent = '● 연결 끊김'; $('live').classList.add('off');
+  }
 
-    let db, collection, getDocs;
-    try {
-      // SDK는 동적 import로 불러와 로딩 실패도 화면에 표시
-      const appMod = await import("https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js");
-      const fsMod = await import("https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js");
-      ({ collection, getDocs } = fsMod);
-      const app = appMod.initializeApp({
-        apiKey: "AIzaSyAXHn1inKIYq5ejWUgZHj_t2jmrZzPExHo",
-        authDomain: "test-e3a4a.firebaseapp.com",
-        projectId: "test-e3a4a",
-        storageBucket: "test-e3a4a.firebasestorage.app",
-        messagingSenderId: "783338136920",
-        appId: "1:783338136920:web:7e8f39e54d27ddacd7712d",
-        measurementId: "G-WR0895B8W8"
-      });
-      db = fsMod.getFirestore(app);
-    } catch (e) {
-      console.error(e);
-      showError('Firebase SDK 로딩 실패', '인터넷 연결 또는 네트워크 차단(학교 방화벽 등)을 확인하세요.<br>' + e.message);
-      downloadBtn.disabled = true;
-    }
-
-    const csvCell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-
-    downloadBtn.addEventListener('click', async () => {
-      downloadBtn.disabled = true;
-      status.textContent = '데이터를 불러오는 중...';
-      try {
-        const snap = await getDocs(collection(db, "submissions"));
-        if (snap.empty) {
-          status.innerHTML = '<span style="color:#eab308;font-weight:bold;">⚠️ 저장된 응답 데이터가 0건입니다.</span><br>four.html에서 제출한 뒤 다시 시도하세요.';
-          return;
-        }
-        const list = snap.docs.map(d => d.data());
-        const ms = x => x?.submittedAt?.toMillis ? x.submittedAt.toMillis() : 0;
-        list.sort((a, b) => ms(a) - ms(b));
-
-        const rows = [["제출일시","관리번호","이름","1번(객관식)","2번(단답)","3번(서술)"]];
-        list.forEach(data => {
-          const t = data.submittedAt?.toDate ? data.submittedAt.toDate().toLocaleString('ko-KR') : '';
-          rows.push([t, data.studentId, data.studentName, data.answers?.q1, data.answers?.q2, data.answers?.q3]);
-        });
-        const csv = '\uFEFF' + rows.map(r => r.map(csvCell).join(',')).join('\r\n');
-        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `형성평가_결과_${new Date().toISOString().slice(0,10)}.csv`;
-        document.body.appendChild(a); a.click(); a.remove();
-        URL.revokeObjectURL(url);
-        status.innerHTML = `<span style="color:#16a34a;font-weight:bold;">✔ 총 ${snap.size}명의 응답 데이터가 다운로드되었습니다.</span>`;
-      } catch (error) {
-        console.error("다운로드 에러:", error);
-        const hints = {
-          'permission-denied': 'Firestore 보안 규칙에서 submissions 읽기(read)가 허용되지 않았습니다. Firebase 콘솔 → Firestore → 규칙을 확인하세요.',
-          'failed-precondition': 'Firestore 데이터베이스가 아직 생성되지 않았거나 설정이 필요합니다. 콘솔에서 데이터베이스를 만드세요.',
-          'unavailable': '네트워크 연결 문제로 Firestore에 접속할 수 없습니다.',
-          'not-found': 'Firestore 데이터베이스(default)를 찾을 수 없습니다. 콘솔에서 생성했는지 확인하세요.'
-        };
-        showError(`다운로드 실패 (${error.code || 'unknown'})`, (hints[error.code] || '') + '<br>' + error.message);
-      } finally {
-        downloadBtn.disabled = false;
-      }
+  function toRecords(snap) {
+    const list = snap.docs.map(d => {
+      const x = d.data();
+      const ts = x.submittedAt?.toDate ? x.submittedAt.toDate() : null;
+      return {
+        time: ts, studentId: x.studentId || '', studentName: x.studentName || '',
+        q1: x.answers?.q1 || '', q2: x.answers?.q2 || '', q3: x.answers?.q3 || ''
+      };
     });
-  </script>
+    list.sort((a, b) => (b.time?.getTime() || 0) - (a.time?.getTime() || 0)); // 최신순
+    return list;
+  }
+
+  function render() {
+    const kw = $('search').value.trim().toLowerCase();
+    const idCount = {};
+    records.forEach(r => idCount[r.studentId] = (idCount[r.studentId] || 0) + 1);
+
+    // 통계
+    const uniq = Object.keys(idCount).length;
+    const dupPeople = Object.values(idCount).filter(n => n > 1).length;
+    const c1 = records.filter(r => r.q1 === CORRECT_Q1).length;
+    $('sTotal').textContent = records.length;
+    $('sUnique').textContent = uniq;
+    $('sDup').textContent = dupPeople;
+    $('sCorrect').textContent = records.length ? Math.round(c1 / records.length * 100) + '%' : '0%';
+    $('sLatest').textContent = records[0]?.time ? records[0].time.toLocaleString('ko-KR') : '-';
+
+    // 1번 선택지 분포
+    const opts = ['HTML', 'Python', 'C++'];
+    $('bars').innerHTML = '<strong>1번 선택 분포</strong>' + opts.map(o => {
+      const n = records.filter(r => r.q1 === o).length;
+      const p = records.length ? n / records.length * 100 : 0;
+      return `<div class="bar-row"><span class="name">${esc(o)}</span><div class="bar"><i style="width:${p}%"></i></div><span class="cnt">${n}명</span></div>`;
+    }).join('');
+
+    // 표
+    const rows = records.filter(r => !kw || r.studentId.toLowerCase().includes(kw) || r.studentName.toLowerCase().includes(kw));
+    if (!rows.length) {
+      $('tbody').innerHTML = `<tr><td colspan="7" class="empty">${records.length ? '검색 결과가 없습니다.' : '아직 제출된 응답이 없습니다.'}</td></tr>`;
+      return;
+    }
+    $('tbody').innerHTML = rows.map((r, i) => `
+      <tr class="${idCount[r.studentId] > 1 ? 'dup' : ''}">
+        <td>${rows.length - i}</td>
+        <td>${r.time ? esc(r.time.toLocaleString('ko-KR')) : '-'}</td>
+        <td>${esc(r.studentId)}${idCount[r.studentId] > 1 ? ' <small>(중복)</small>' : ''}</td>
+        <td>${esc(r.studentName)}</td>
+        <td class="${r.q1 === CORRECT_Q1 ? 'ok' : 'no'}">${esc(r.q1)}</td>
+        <td class="${r.q2.trim().toLowerCase() === CORRECT_Q2 ? 'ok' : 'no'}">${esc(r.q2)}</td>
+        <td class="q3">${esc(r.q3)}</td>
+      </tr>`).join('');
+  }
+
+  // 실시간 구독
+  function subscribe() {
+    onSnapshot(collection(db, "submissions"), snap => {
+      records = toRecords(snap);
+      $('status').innerHTML = '';
+      $('live').textContent = '● 실시간 연결됨'; $('live').classList.remove('off');
+      render();
+    }, showError);
+  }
+  subscribe();
+
+  $('search').addEventListener('input', render);
+  $('reloadBtn').addEventListener('click', async () => {
+    try { records = toRecords(await getDocs(collection(db, "submissions"))); $('status').innerHTML = ''; render(); }
+    catch (e) { showError(e); }
+  });
+
+  // CSV 다운로드 (화면의 전체 데이터, 시간순)
+  const csvCell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  $('downloadBtn').addEventListener('click', () => {
+    if (!records.length) { $('status').innerHTML = '<span style="color:#eab308;font-weight:bold;">⚠️ 저장된 응답 데이터가 0건입니다.</span>'; return; }
+    const rows = [["제출일시","관리번호","이름","1번(객관식)","2번(단답)","3번(서술)"]];
+    [...records].reverse().forEach(r => rows.push([r.time ? r.time.toLocaleString('ko-KR') : '', r.studentId, r.studentName, r.q1, r.q2, r.q3]));
+    const csv = '\uFEFF' + rows.map(r => r.map(csvCell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = `형성평가_결과_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    $('status').innerHTML = `<span style="color:#16a34a;font-weight:bold;">✔ 총 ${records.length}건의 응답 데이터가 다운로드되었습니다.</span>`;
+  });
+</script>
 </body>
 </html>
